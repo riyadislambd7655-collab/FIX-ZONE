@@ -1,30 +1,77 @@
 package com.fixzone.app;
 
-import android.content.*;
+import android.content.ContentValues;
+import android.content.Context;
 import android.database.Cursor;
-import android.database.sqlite.*;
-import org.json.JSONArray;
-import org.json.JSONObject;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ShopDb extends SQLiteOpenHelper {
-    public ShopDb(Context c) { super(c, "fixzone.db", null, 1); }
-    public void onCreate(SQLiteDatabase d) {
-        d.execSQL("CREATE TABLE inventory(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL,qty INTEGER NOT NULL,price REAL NOT NULL)");
-        d.execSQL("CREATE TABLE repairs(id INTEGER PRIMARY KEY AUTOINCREMENT,customer TEXT,phone TEXT,device TEXT,problem TEXT,status TEXT)");
+    public ShopDb(Context context) {
+        super(context, "fixzone.db", null, 1);
     }
-    public void onUpgrade(SQLiteDatabase d,int o,int n) { d.execSQL("DROP TABLE IF EXISTS inventory"); d.execSQL("DROP TABLE IF EXISTS repairs"); onCreate(d); }
-    public void addItem(String name,int qty,double price) {
-        ContentValues v=new ContentValues(); v.put("name",name); v.put("qty",qty); v.put("price",price); getWritableDatabase().insert("inventory",null,v);
+
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, qty INTEGER, price REAL)");
+        db.execSQL("CREATE TABLE repairs (id INTEGER PRIMARY KEY AUTOINCREMENT, customer TEXT, phone TEXT, device TEXT, issue TEXT, cost REAL, status TEXT)");
     }
-    public void addRepair(String customer,String phone,String device,String problem) {
-        ContentValues v=new ContentValues(); v.put("customer",customer); v.put("phone",phone); v.put("device",device); v.put("problem",problem); v.put("status","Pending"); getWritableDatabase().insert("repairs",null,v);
+
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        db.execSQL("DROP TABLE IF EXISTS items");
+        db.execSQL("DROP TABLE IF EXISTS repairs");
+        onCreate(db);
     }
-    public JSONArray exportJson() throws Exception {
-        JSONObject out=new JSONObject(); JSONArray inv=new JSONArray(), rep=new JSONArray();
-        Cursor c=getReadableDatabase().rawQuery("SELECT * FROM inventory",null);
-        while(c.moveToNext()){ JSONObject x=new JSONObject(); x.put("id",c.getInt(0)); x.put("name",c.getString(1)); x.put("qty",c.getInt(2)); x.put("price",c.getDouble(3)); inv.put(x); } c.close();
-        c=getReadableDatabase().rawQuery("SELECT * FROM repairs",null);
-        while(c.moveToNext()){ JSONObject x=new JSONObject(); x.put("id",c.getInt(0)); x.put("customer",c.getString(1)); x.put("phone",c.getString(2)); x.put("device",c.getString(3)); x.put("problem",c.getString(4)); x.put("status",c.getString(5)); rep.put(x); } c.close();
-        out.put("inventory",inv); out.put("repairs",rep); out.put("app","FIX ZONE"); return new JSONArray().put(out);
+
+    public void addItem(String name, int qty, double price) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put("name", name);
+        cv.put("qty", qty);
+        cv.put("price", price);
+        db.insert("items", null, cv);
+    }
+
+    public void addRepair(String customer, String phone, String device, String issue, double cost) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put("customer", customer);
+        cv.put("phone", phone);
+        cv.put("device", device);
+        cv.put("issue", issue);
+        cv.put("cost", cost);
+        cv.put("status", "Pending");
+        db.insert("repairs", null, cv);
+    }
+
+    public List<String> getAllItems() {
+        List<String> list = new ArrayList<>();
+        Cursor c = getReadableDatabase().rawQuery("SELECT * FROM items ORDER BY id DESC", null);
+        while (c.moveToNext()) {
+            list.add("📦 " + c.getString(1) + " | Qty: " + c.getInt(2) + " | ৳" + c.getDouble(3));
+        }
+        c.close();
+        return list;
+    }
+
+    public List<String> getAllRepairs() {
+        List<String> list = new ArrayList<>();
+        Cursor c = getReadableDatabase().rawQuery("SELECT * FROM repairs ORDER BY id DESC", null);
+        while (c.moveToNext()) {
+            list.add("🛠️ " + c.getString(1) + " (" + c.getString(2) + ")\n📱 " + c.getString(3) + " - " + c.getString(4) + " | ৳" + c.getDouble(5));
+        }
+        c.close();
+        return list;
+    }
+
+    public String exportBackupText() {
+        StringBuilder sb = new StringBuilder("=== FIX ZONE BACKUP ===\n\n[INVENTORY]\n");
+        for (String s : getAllItems()) sb.append(s).append("\n");
+        sb.append("\n[REPAIRS]\n");
+        for (String s : getAllRepairs()) sb.append(s).append("\n\n");
+        return sb.toString();
     }
 }
